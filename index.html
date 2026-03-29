@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>全国景点地图</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="stylesheet" href="css/all.min.css" />
+    <link rel="stylesheet" href="css/index.css" />
+    <link rel="stylesheet" href="css/multiselect.css" />
+    <script type="module">
+      import { AMAP_SECURITY_CONFIG, AMAP_KEY } from './js/config.js';
+
+      // 检查高德地图配置是否完整
+      if (!AMAP_KEY) {
+        document.body.innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+            <h2 style="color: #e74c3c; margin-bottom: 20px;">⚠️ 高德地图配置缺失</h2>
+            <p style="color: #666; margin-bottom: 10px;">请在 <code>js/config.local.js</code> 中配置 AMAP_KEY</p>
+            <p style="color: #999; font-size: 14px;">获取方式：登录高德开放平台 (https://console.amap.com/) → 应用管理 → 创建应用 → 添加 Key</p>
+          </div>
+        `;
+        throw new Error('AMAP_KEY is not configured. Please set it in js/config.js');
+      }
+
+      if (!AMAP_SECURITY_CONFIG || !AMAP_SECURITY_CONFIG.securityJsCode) {
+        document.body.innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+            <h2 style="color: #e74c3c; margin-bottom: 20px;">⚠️ 高德地图安全配置缺失</h2>
+            <p style="color: #666; margin-bottom: 10px;">请在 <code>js/config.local.js</code> 中配置 AMAP_SECURITY_CONFIG.securityJsCode</p>
+            <p style="color: #999; font-size: 14px;">获取方式：登录高德开放平台 → 应用管理 → 对应应用的"安全密钥"选项</p>
+          </div>
+        `;
+        throw new Error('AMAP_SECURITY_CONFIG.securityJsCode is not configured. Please set it in js/config.js');
+      }
+
+      window._AMapSecurityConfig = AMAP_SECURITY_CONFIG;
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.AutoComplete,AMap.Driving,AMap.Geocoder`;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="sidebar-left">
+        <div class="route-info">
+          <div class="route-info-item">
+            <label for="departureSearch">出发地：</label>
+            <div class="input-with-clear">
+              <input type="text" id="departureSearch" placeholder="请输入出发地" />
+              <button id="clearDeparture" class="clear-input" aria-label="清除出发地">×</button>
+            </div>
+          </div>
+          <div class="route-info-item">
+            <label for="destPlace">目的地：</label>
+            <input type="text" class="readonly" id="destPlace" readonly />
+          </div>
+          <div class="route-info-item">
+            <label for="routeDistance">距离(KM)：</label>
+            <input type="text" class="readonly" id="routeDistance" readonly />
+          </div>
+          <div class="route-info-item">
+            <label for="routeTime">预计时间：</label>
+            <input type="text" class="readonly" id="routeTime" readonly />
+          </div>
+          <div class="route-info-item">
+            <button class="route-button" id="navigateInAMap">使用高德导航</button>
+          </div>
+          <div class="route-info-item">
+            <button class="route-button" onclick="clearRoute()">清除路线</button>
+          </div>
+        </div>
+      </div>
+      <div class="map-container" id="map-container">
+        <div class="filters">
+          <div class="filter-group">
+            <label for="province-select">选择区域</label>
+            <select id="province-select" multiple>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="comment-select">评论数不少于</label>
+            <select id="comment-select">
+              <option value="0">0</option>
+              <option value="10">10</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="300">300</option>
+              <option value="400">400</option>
+              <option value="500" selected>500</option>
+              <option value="1000">1000</option>
+              <option value="2000">2000</option>
+              <option value="5000">5000</option>
+              <option value="10000">10000</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <div class="unvisited-toggle">
+              <span>只显示未去过</span>
+              <div class="unvisited-toggle-switch">
+                <div class="unvisited-toggle-slider"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <div class="theme-toggle">
+              <span>Dark</span>
+              <div class="theme-toggle-switch">
+                <div class="theme-toggle-slider"></div>
+              </div>
+              <span>Light</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar">
+        <div class="spot-list" id="spot-list"></div>
+      </div>
+    </div>
+    <div class="spot-count" id="spotCount">景点数: 0</div>
+    <button id="toggle-sidebar" class="toggle-sidebar">
+      <i class="fas fa-bars"></i>
+    </button>
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+    </div>
+    <footer class="copyright">
+      <p>&copy; 2024 全国景点地图. All rights reserved.</p>
+    </footer>
+    <script src="js/multiselect.js"></script>
+    <script type="module" src="js/index.js"></script>
+
+    <script>
+      window.onAMapLoaded = function () {
+        window.dispatchEvent(new Event('AMapLoaded'));
+      };
+    </script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+# 本地配置文件（包含敏感信息）
+js/config.local.js
+
+# 编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
